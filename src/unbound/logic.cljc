@@ -87,16 +87,16 @@
       v)))
 
 (defn assign [environment variable assignment]
-  (if (= variable assignment)
-    environment
-    (persistent!
-      (reduce-kv
-        (fn [acc k v]
-          (if (= k variable)
-            acc
-            (assoc! acc k (substitute v variable assignment))))
-        (transient {variable assignment})
-        environment))))
+  (persistent!
+    (reduce-kv
+      (fn [acc k v]
+        (if (= k variable)
+          acc
+          (assoc! acc k (substitute v variable assignment))))
+      (transient {variable (if (contains? environment assignment)
+                             (get environment assignment)
+                             assignment)})
+      environment)))
 
 (defn compatible? [[[variable assignment] & more] environment]
   (if variable

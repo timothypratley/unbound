@@ -83,7 +83,10 @@
            (unify '#{2 X} '#{1 2})))
 
     (is (= '{X 1}
-           (unify '#{X 2} '#{1 2}))))
+           (unify '#{X 2} '#{1 2})))
+
+    (is (= '{Z 2, Y 1, X 2}
+           (unify '(X 1 (foo Z)) '(2 Y (foo X))))))
 
   (testing "Non-unifying complex expressions"
     (is (false? (unify '(foo 1) '(foo 2))))

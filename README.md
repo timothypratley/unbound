@@ -17,7 +17,7 @@ https://clojure.org/guides/deps_and_cli#_using_git_libraries
 
 ```clojure
 (l/unify '(X 1 (foo Z)) '(2 Y (foo X)))
-;=> {Z X, Y 1, X 2}
+;=> {Z 2, Y 1, X 2}
 ```
 
 See the [tests](test/) and [docstrings](src/) for more info.
