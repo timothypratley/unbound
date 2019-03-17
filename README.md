@@ -2,10 +2,25 @@
 
 A propositional logic library (Clojure/Script).
 
+![Spock](https://pixel.nymag.com/imgs/thecut/slideshows/2014/9/eyebrows/eyebrows-29.nocrop.w840.h1330.2x.jpg)
+
+
 ## Usage
 
-No releases are provided at this time, but you can use unbound as a git dependency:
+No releases are provided at this time. You can use unbound as a git dependency:
 https://clojure.org/guides/deps_and_cli#_using_git_libraries
+
+```clojure
+(ns my.ns
+  (:require [unbound.logic :as l]))
+```
+
+```clojure
+(l/unify '(X 1 (foo Z)) '(2 Y (foo X)))
+;=> {Z X, Y 1, X 2}
+```
+
+See the [tests](test/) and [docstrings](src/) for more info.
 
 ## About
 
