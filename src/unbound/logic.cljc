@@ -1,4 +1,5 @@
-(ns unbound.logic)
+(ns unbound.logic
+  (:require [clojure.set :as set]))
 
 (def variable-leaders
   (set (seq "_?ABCDEFGHIJKLMNOPQRSTUVWXYZ")))
@@ -111,3 +112,20 @@
           (recur more e)
           false)))
     environment))
+
+;; TODO: need to introduce _gensym variables
+(defn apply-rules [knowledge-base question variables environment]
+  (if (empty? (set/difference variables (set (keys environment))))
+    environment
+    (first
+      (remove false?
+              (for [rule knowledge-base
+                    :let [e (unify question rule)]
+                    :when e]
+                (apply-rules knowledge-base question variables (compatible? e environment)))))))
+
+(defn query [knowledge-base question]
+  (let [variables (set (filter variable? (tree-seq seqable? seq question)))]
+    (select-keys
+      (apply-rules knowledge-base question variables {})
+      variables)))

@@ -20,6 +20,14 @@ https://clojure.org/guides/deps_and_cli#_using_git_libraries
 ;=> {Z 2, Y 1, X 2}
 ```
 
+```clojure
+(let [line-facts '[(vertical (line (point X _) (point X _)))
+                   (horizontal (line (point _ Y) (point _ Y)))]
+      question '(horizontal (line (point 1 1) (point 2 Y)))]
+  (l/query line-facts question))
+;=> {Y 1}
+```
+
 See the [tests](test/) and [docstrings](src/) for more info.
 
 ## About

@@ -94,3 +94,13 @@
     (is (false? (unify '(foo X X Y Z) '(foo (bar Y) (bar Z) 1 2))))
     (is (false? (unify '(foo X) '(foo 1 2))))
     (is (false? (unify '#{X 1} '#{2 X})))))
+
+(deftest query-test
+  (let [line-facts '[(vertical (line (point X _) (point X _)))
+                     (horizontal (line (point _ Y) (point _ Y)))]]
+    (is (= {}
+           (query line-facts '(vertical (line (point 1 1) (point 1 3))))))
+    (is (= '{Y 1}
+           (query line-facts '(horizontal (line (point 1 1) (point 2 Y))))))
+    (is (= '{P (point _ 3)}
+           (query line-facts '(horizontal (line (point 2 3) P)))))))
