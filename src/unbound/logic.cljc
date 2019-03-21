@@ -113,19 +113,48 @@
           false)))
     environment))
 
-;; TODO: need to introduce _gensym variables
-(defn apply-rules [knowledge-base question variables environment]
-  (if (empty? (set/difference variables (set (keys environment))))
-    environment
-    (first
-      (remove false?
-              (for [rule knowledge-base
-                    :let [e (unify question rule)]
-                    :when e]
-                (apply-rules knowledge-base question variables (compatible? e environment)))))))
+(defn rule? [xs]
+  (and (seqable? xs)
+       (= :- (second xs))))
+
+(defn replace-variables [expression generated-variables]
+  (if (variable? expression)
+    (get generated-variables expression)
+    (if (seqable? expression)
+      (for [sub-expression expression]
+        (replace-variables sub-expression generated-variables))
+      expression)))
+
+(defn every [pred coll acc]
+  (if (nil? (seq coll))
+    acc
+    (if-let [result (pred (first coll))]
+      (recur pred (next coll) result)
+      false)))
+
+(defn apply-rules [knowledge-base question]
+  (first
+    (remove false?
+            (for [fact-or-rule knowledge-base]
+              (if (rule? fact-or-rule)
+                (if-let [e (unify question (first fact-or-rule))]
+                  (let [body (-> (nth fact-or-rule 2)
+                                 (replace-variables (set/map-invert e)))]
+                    (condp = (first body)
+                      'and (every #(apply-rules knowledge-base %) (rest body) {})
+                      'or (or (some #(apply-rules knowledge-base %) (rest body)) false)
+                      (apply-rules knowledge-base body)))
+                  false)
+                (unify question fact-or-rule))))))
 
 (defn query [knowledge-base question]
-  (let [variables (set (filter variable? (tree-seq seqable? seq question)))]
-    (select-keys
-      (apply-rules knowledge-base question variables {})
-      variables)))
+  (let [variables (set (filter variable? (tree-seq seqable? seq question)))
+        generated-variables (into {}
+                                  (for [variable variables]
+                                    [variable (gensym (str "_" variable))]))
+        new-question (replace-variables question generated-variables)]
+    (if-let [result (apply-rules knowledge-base new-question)]
+      ;; rename the generated names back to the input names
+      (set/rename-keys (select-keys result (vals generated-variables))
+                       (set/map-invert generated-variables))
+      false)))

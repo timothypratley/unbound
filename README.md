@@ -15,10 +15,16 @@ https://clojure.org/guides/deps_and_cli#_using_git_libraries
   (:require [unbound.logic :as l]))
 ```
 
+### Unification
+
 ```clojure
 (l/unify '(X 1 (foo Z)) '(2 Y (foo X)))
 ;=> {Z 2, Y 1, X 2}
 ```
+
+### Query
+
+#### Facts
 
 ```clojure
 (let [line-facts '[(vertical (line (point X _) (point X _)))
@@ -28,6 +34,22 @@ https://clojure.org/guides/deps_and_cli#_using_git_libraries
 ;=> {Y 1}
 ```
 
+#### Rules
+
+```clojure
+(let [facts-and-rule '[(f a)
+                       (f b)
+                       (g a)
+                       (g b)
+                       (h b)
+                       ((k X) :- (and (f X) (g X) (h X)))]]
+  (query facts-and-rule '(k Y)))
+;=> {Y b}
+```
+
+## API Documentation
+
+Still in flux.
 See the [tests](test/) and [docstrings](src/) for more info.
 
 ## About

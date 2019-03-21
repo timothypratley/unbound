@@ -103,4 +103,13 @@
     (is (= '{Y 1}
            (query line-facts '(horizontal (line (point 1 1) (point 2 Y))))))
     (is (= '{P (point _ 3)}
-           (query line-facts '(horizontal (line (point 2 3) P)))))))
+           (query line-facts '(horizontal (line (point 2 3) P))))))
+
+  (let [facts-and-rule '[(f a)
+                         (f b)
+                         (g a)
+                         (g b)
+                         (h b)
+                         ((k X) :- (and (f X) (g X) (h X)))]]
+    (is (= '{Y b}
+           (query facts-and-rule '(k Y))))))
