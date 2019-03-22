@@ -105,11 +105,20 @@
     (is (= '{P (point _ 3)}
            (query line-facts '(horizontal (line (point 2 3) P))))))
 
-  (let [facts-and-rule '[(f a)
-                         (f b)
+  (let [facts-and-rule '[(generate-variables a)
+                         (generate-variables b)
                          (g a)
                          (g b)
                          (h b)
-                         ((k X) :- (and (f X) (g X) (h X)))]]
+                         ((k X) :- (and (generate-variables X) (g X) (h X)))]]
     (is (= '{Y b}
-           (query facts-and-rule '(k Y))))))
+           (query facts-and-rule '(k Y)))))
+
+  (let [knowledge-base  '[(loves vincent mia)
+                          (loves marcellus mia)
+                          ((jealous A B) :- (and (loves A C) (loves B C)))]]
+    (is (= '{Y vincent
+             ;;X vincent
+             }
+           (binding [*trace* true]
+             (query knowledge-base '(jealous X Y)))))))

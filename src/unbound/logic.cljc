@@ -1,6 +1,10 @@
 (ns unbound.logic
   (:require [clojure.set :as set]))
 
+(def ^:dynamic *trace*
+  "Tracing is useful for debugging rules. Bind *trace* to true and it will print to stdout."
+  false)
+
 (def variable-leaders
   (set (seq "_?ABCDEFGHIJKLMNOPQRSTUVWXYZ")))
 
@@ -117,9 +121,15 @@
   (and (seqable? xs)
        (= :- (second xs))))
 
+(defn generate-variables [question]
+  (into {}
+        (for [variable (set (remove (fn [v] (= \_ (first (name v))))
+                                    (filter variable? (tree-seq seqable? seq question))))]
+          [variable (gensym (str "_" variable))])))
+
 (defn replace-variables [expression generated-variables]
   (if (variable? expression)
-    (get generated-variables expression)
+    (get generated-variables expression expression)
     (if (seqable? expression)
       (for [sub-expression expression]
         (replace-variables sub-expression generated-variables))
@@ -136,23 +146,30 @@
   (first
     (remove false?
             (for [fact-or-rule knowledge-base]
+              ;; TODO: must check that everything unified
               (if (rule? fact-or-rule)
                 (if-let [e (unify question (first fact-or-rule))]
                   (let [body (-> (nth fact-or-rule 2)
-                                 (replace-variables (set/map-invert e)))]
+                                 (replace-variables (set/map-invert e)))
+                        g (generate-variables body)
+                        body (replace-variables body g)]
+                    (when *trace*
+                      (println "MATCHED:" fact-or-rule)
+                      (println "ASKING:" body))
                     (condp = (first body)
                       'and (every #(apply-rules knowledge-base %) (rest body) {})
                       'or (or (some #(apply-rules knowledge-base %) (rest body)) false)
                       (apply-rules knowledge-base body)))
-                  false)
-                (unify question fact-or-rule))))))
+                  (doto false (do (when *trace* (println "UNMATCHED:" question (first fact-or-rule))))))
+                (doto
+                  (unify question fact-or-rule)
+                  (do (when *trace* (println "UNIFY:" question fact-or-rule (unify question fact-or-rule))))))))))
 
 (defn query [knowledge-base question]
-  (let [variables (set (filter variable? (tree-seq seqable? seq question)))
-        generated-variables (into {}
-                                  (for [variable variables]
-                                    [variable (gensym (str "_" variable))]))
+  (let [generated-variables (generate-variables question)
         new-question (replace-variables question generated-variables)]
+    (when *trace*
+      (println "INIT:" new-question))
     (if-let [result (apply-rules knowledge-base new-question)]
       ;; rename the generated names back to the input names
       (set/rename-keys (select-keys result (vals generated-variables))
