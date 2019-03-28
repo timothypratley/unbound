@@ -24,6 +24,9 @@ https://clojure.org/guides/deps_and_cli#_using_git_libraries
 
 ### Query
 
+The `query` function returns a sequence of solutions.
+
+
 #### Facts
 
 ```clojure
@@ -31,7 +34,7 @@ https://clojure.org/guides/deps_and_cli#_using_git_libraries
                    (horizontal (line (point _ Y) (point _ Y)))]
       question '(horizontal (line (point 1 1) (point 2 Y)))]
   (l/query line-facts question))
-;=> {Y 1}
+;=> ({Y 1})
 ```
 
 #### Rules
@@ -43,9 +46,13 @@ https://clojure.org/guides/deps_and_cli#_using_git_libraries
                        (g b)
                        (h b)
                        ((k X) :- (and (f X) (g X) (h X)))]]
-  (query facts-and-rule '(k Y)))
-;=> {Y b}
+  (l/query facts-and-rule '(k Y)))
+;=> ({Y b})
 ```
+
+### Recursive Rules
+
+
 
 ## API Documentation
 

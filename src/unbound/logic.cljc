@@ -5,10 +5,10 @@
   "Tracing is useful for debugging rules. Bind *trace* to true and it will print to stdout."
   false)
 
-(def variable-leaders
+(def ^:private variable-leaders
   (set (seq "_?ABCDEFGHIJKLMNOPQRSTUVWXYZ")))
 
-(defn variable?
+(defn- variable?
   "Returns true if the input argument is free to be bound.
   Unbound vars are unwieldy, so symbols are also considered to be variables if they follow variable naming convention.
   In Prolog variable names with an upper-case letter.
@@ -18,21 +18,24 @@
   (or (and (var? x) (not (bound? x)))
       (and (symbol? x) (contains? variable-leaders (first (name x))))))
 
-(defn complex? [x]
+(defn- complex? [x]
   (coll? x))
 
-(defn constant? [x]
+(defn- constant? [x]
   (not (or (variable? x)
            (complex? x))))
 
-(declare compatible?)
+(declare ^:private compatible?)
 
-(defn all-compatible? [[instantiation & more] environment]
-  (if instantiation
-    (if-let [expanded-environment (compatible? instantiation environment)]
-      (recur more expanded-environment)
-      false)
-    environment))
+(defn- all-compatible?
+  ([instantiations]
+    (all-compatible? instantiations {}))
+  ([[instantiation & more] environment]
+    (if instantiation
+      (if-let [expanded-environment (compatible? instantiation environment)]
+        (recur more expanded-environment)
+        false)
+      environment)))
 
 (defn unify
   "Compares two expressions which may contain unbound variables.
@@ -79,19 +82,19 @@
           (let [instantiations (map unify x y)]
             (and
               (every? identity instantiations)
-              (all-compatible? instantiations {}))))
+              (all-compatible? instantiations))))
 
         :else
         false))
 
-(defn substitute [v variable assignment]
+(defn- substitute [v variable assignment]
   (if (= v variable)
     assignment
     (if (complex? v)
       (map #(substitute % variable assignment) v)
       v)))
 
-(defn assign [environment variable assignment]
+(defn- assign [environment variable assignment]
   (persistent!
     (reduce-kv
       (fn [acc k v]
@@ -103,31 +106,33 @@
                              assignment)})
       environment)))
 
-(defn compatible? [[[variable assignment] & more] environment]
+(defn- compatible? [[[variable assignment] & more] environment]
   (if variable
     (if (= variable assignment)
       environment
       (if (contains? environment variable)
         (let [existing (get environment variable)]
           (if-let [e (unify existing assignment)]
-            (compatible? e environment)
+            (if-let [ee (compatible? e environment)]
+              (recur more ee)
+              false)
             false))
         (if-let [e (assign environment variable assignment)]
           (recur more e)
           false)))
     environment))
 
-(defn rule? [xs]
+(defn- rule? [xs]
   (and (seqable? xs)
        (= :- (second xs))))
 
-(defn generate-variables [question]
+(defn- generate-variables [question]
   (into {}
         (for [variable (set (remove (fn [v] (= \_ (first (name v))))
                                     (filter variable? (tree-seq seqable? seq question))))]
           [variable (gensym (str "_" variable))])))
 
-(defn replace-variables [expression generated-variables]
+(defn- replace-variables [expression generated-variables]
   (if (variable? expression)
     (get generated-variables expression expression)
     (if (seqable? expression)
@@ -135,43 +140,64 @@
         (replace-variables sub-expression generated-variables))
       expression)))
 
-(defn every [pred coll acc]
-  (if (nil? (seq coll))
-    acc
-    (if-let [result (pred (first coll))]
-      (recur pred (next coll) result)
-      false)))
+(defn- cartesian-product [y]
+  (if (seq y)
+    (let [[xs & xss] y]
+      (if (seq xss)
+        (for [x xs
+              t (cartesian-product xss)]
+          (cons x t))
+        (for [x xs]
+          [x])))
+    y))
 
-(defn apply-rules [knowledge-base question]
-  (first
-    (remove false?
-            (for [fact-or-rule knowledge-base]
-              ;; TODO: must check that everything unified
-              (if (rule? fact-or-rule)
-                (if-let [e (unify question (first fact-or-rule))]
-                  (let [body (-> (nth fact-or-rule 2)
-                                 (replace-variables (set/map-invert e)))
-                        g (generate-variables body)
-                        body (replace-variables body g)]
-                    (when *trace*
-                      (println "MATCHED:" fact-or-rule)
-                      (println "ASKING:" body))
-                    (condp = (first body)
-                      'and (every #(apply-rules knowledge-base %) (rest body) {})
-                      'or (or (some #(apply-rules knowledge-base %) (rest body)) false)
-                      (apply-rules knowledge-base body)))
-                  (doto false (do (when *trace* (println "UNMATCHED:" question (first fact-or-rule))))))
-                (doto
-                  (unify question fact-or-rule)
-                  (do (when *trace* (println "UNIFY:" question fact-or-rule (unify question fact-or-rule))))))))))
+(defn- apply-rules [knowledge-base question]
+  (remove false?
+          (apply concat
+                 (for [fact-or-rule knowledge-base]
+                   (if (rule? fact-or-rule)
+                     (let [rule-head (first fact-or-rule)]
+                       (if-let [e (unify question rule-head)]
+                         (let [ee (set/map-invert e)
+                               body (-> (nth fact-or-rule 2)
+                                        (replace-variables ee))
+                               g (generate-variables body)
+                               body (replace-variables body g)]
+                           (when *trace*
+                             (println "MATCHED:" fact-or-rule)
+                             (println "ASKING:" body))
+                           (for [solution
+                                 (case (first body)
+                                   and (keep all-compatible?
+                                             (cartesian-product
+                                               (for [clause (rest body)]
+                                                 (apply-rules knowledge-base clause))))
 
-(defn query [knowledge-base question]
-  (let [generated-variables (generate-variables question)
-        new-question (replace-variables question generated-variables)]
+                                   or (mapcat #(apply-rules knowledge-base %) (rest body))
+                                   (apply-rules knowledge-base body))
+                                 :when solution]
+                             (cond-> solution
+                                     *trace* (doto (->> (println "SOLUTION:"))))))
+                         (do
+                           (when *trace*
+                             (println "UNMATCHED:" question rule-head))
+                           ())))
+                     (cond-> (if-let [solution (unify question fact-or-rule)]
+                               [solution]
+                               ())
+                             *trace* (doto (->> (println "UNIFY:" question fact-or-rule)))))))))
+
+(defn- re-label [result generated-variables]
+  (set/rename-keys (select-keys result (vals generated-variables))
+                   (set/map-invert generated-variables)))
+
+(defn query
+  "Given a question, and a knowledge-base of facts and rules,
+  returns a sequence of solutions as maps of variable assignments."
+  [knowledge-base question]
+  (let [g (generate-variables question)
+        new-question (replace-variables question g)]
     (when *trace*
       (println "INIT:" new-question))
-    (if-let [result (apply-rules knowledge-base new-question)]
-      ;; rename the generated names back to the input names
-      (set/rename-keys (select-keys result (vals generated-variables))
-                       (set/map-invert generated-variables))
-      false)))
+    (for [solution (apply-rules knowledge-base new-question)]
+      (re-label solution g))))
