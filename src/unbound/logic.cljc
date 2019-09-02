@@ -87,6 +87,21 @@
         :else
         false))
 
+;; TODO: to be bi-directional,
+(defn z [xs ys]
+  
+  (cond
+    (some '#{& |} xs)
+    (let [head (take-while (complement '#{&}))
+          n (count head)
+          tail (drop (inc n) xs)]
+      (unify
+        (list head tail)
+        (list (take n ys) (drop n ys))))
+
+    :else
+    xs))
+
 (defn- substitute [v variable assignment]
   (if (= v variable)
     assignment

@@ -93,7 +93,19 @@
     (is (false? (unify '(foo X 1) '(foo 2 X))))
     (is (false? (unify '(foo X X Y Z) '(foo (bar Y) (bar Z) 1 2))))
     (is (false? (unify '(foo X) '(foo 1 2))))
-    (is (false? (unify '#{X 1} '#{2 X})))))
+    (is (false? (unify '#{X 1} '#{2 X}))))
+
+  (testing "List unification"
+    (is (= '{}
+           (unify '(:a :b :c & [:d :e]) '(:a & [:b :c :d :e]))
+           ;;(unify '(:a :b :c | [:d :e]) '(:a :b :c :d :e))
+           (unify '(:a :b :c & [:d :e]) '(:a :b :c :d :e))))
+    (is (= '{A :a
+             B :b
+             C :c
+             Tail (:d :e)}
+           (unify '([A B C] | Tail) '(:a :b :c :d :e))
+           (unify '(A B C & Tail) '(:a :b :c :d :e))))))
 
 (deftest query-test
   (let [line-facts '[(vertical (line (point X _) (point X _)))
